@@ -1,0 +1,22 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - name: Demo run on synthetic data
+        run: |
+          gnsslab simulate --out /tmp/sample
+          gnsslab static open=/tmp/sample/static_open_sky.txt urban=/tmp/sample/static_urban.txt --out /tmp/static
+          gnsslab drive /tmp/sample/drive.csv --out /tmp/drive

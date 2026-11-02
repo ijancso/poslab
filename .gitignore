@@ -1,0 +1,8 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+results/
+private/
+# raw phone recordings stay local unless you decide to publish them
+data/raw/
