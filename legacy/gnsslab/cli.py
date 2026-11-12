@@ -96,7 +96,7 @@ def main(argv=None) -> int:
     d.set_defaults(func=cmd_drive)
 
     m = sub.add_parser("simulate", help="write synthetic demo logs")
-    m.add_argument("--out", default="data/sample")
+    m.add_argument("--out", default="legacy/data/sample")
     m.add_argument("--seed", type=int, default=1)
     m.set_defaults(func=cmd_simulate)
 

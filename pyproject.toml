@@ -3,22 +3,44 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gnsslab"
+name = "poslab"
 version = "0.1.0"
-description = "Measure phone GNSS accuracy and Kalman-filter drift during GNSS outages"
+description = "Positioning replay test harness: synthetic scenarios, fusion algorithms, metrics, baseline regression"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-dependencies = ["numpy>=1.24", "matplotlib>=3.7"]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+    "pyyaml>=6.0",
+]
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4"]
 
 [project.scripts]
+# earlier experiments (legacy/gnsslab), kept runnable
 gnsslab = "gnsslab.cli:main"
 
 [tool.setuptools]
-packages = ["gnsslab"]
+packages = ["poslab", "gnsslab"]
+
+[tool.setuptools.package-dir]
+gnsslab = "legacy/gnsslab"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "legacy/tests"]
+markers = [
+    "scenario: scenario x algorithm tests (slower)",
+    "smoke: small scenario subset run on every push",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["legacy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

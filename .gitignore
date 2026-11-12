@@ -6,3 +6,12 @@ results/
 private/
 # raw phone recordings stay local unless you decide to publish them
 data/raw/
+
+# poslab build output
+data/generated/
+out/
+.coverage
+htmlcov/
+.ruff_cache/
+# private code walkthrough
+notes/

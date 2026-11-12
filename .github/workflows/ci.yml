@@ -14,9 +14,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
-      - run: pytest -q
-      - name: Demo run on synthetic data
+      - name: Lint (poslab)
+        run: ruff check poslab tests
+      - name: Tests (poslab + legacy)
+        run: pytest -q
+      - name: Legacy demo run on synthetic data
         run: |
-          gnsslab simulate --out /tmp/sample
-          gnsslab static open=/tmp/sample/static_open_sky.txt urban=/tmp/sample/static_urban.txt --out /tmp/static
-          gnsslab drive /tmp/sample/drive.csv --out /tmp/drive
+          gnsslab simulate --out "$RUNNER_TEMP/sample"
+          gnsslab static open="$RUNNER_TEMP/sample/static_open_sky.txt" urban="$RUNNER_TEMP/sample/static_urban.txt" --out "$RUNNER_TEMP/static"
+          gnsslab drive "$RUNNER_TEMP/sample/drive.csv" --out "$RUNNER_TEMP/drive"
