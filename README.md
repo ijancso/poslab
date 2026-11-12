@@ -10,9 +10,9 @@ a report for developers → all of it running in CI.
 > recordings from my own Android phone. Nothing here was field-tested on a real vehicle,
 > and no claim of field-testing experience is made.
 
-> **Status:** work in progress. Done: scenario generator (M1). Next: DSP, a GNSS-only
-> Kalman filter and metrics (M2), the fusion EKF (M3), baseline regression, HTML report
-> and full CI (M4).
+> **Status:** work in progress. Done: scenario generator (M1); DSP, the GNSS-only baseline
+> Kalman filter, metrics and the GnssLogger loader (M2). Next: the fusion EKF and scenario
+> tests (M3), baseline regression, HTML report and full CI (M4).
 
 ## Quick start
 
@@ -23,7 +23,26 @@ pytest -q
 
 python -m poslab generate --all          # or --smoke, or scenario names
 python tools/plot_scenario.py open_sky_rtk outage_30s_turn   # -> out/plots/*.png
+python -m poslab run --all               # algorithms x scenarios -> out/metrics.json
 ```
+
+`run` regenerates a scenario automatically if its data is missing or was generated from a
+different YAML / generator version, prints a summary table and writes `out/metrics.json`
+(`{scenario: {algorithm: {metric: value}}}`) and the estimates to `out/estimates/`.
+
+## Metrics
+
+All in metres, after a 5 s filter warm-up:
+
+| Key | Meaning |
+|---|---|
+| `h_rms_m`, `h_cep50_m`, `h_cep95_m`, `h_max_m` | horizontal error vs truth (CEP = percentile radius) |
+| `xt_rms_m`, `xt_max_m` | cross-track error: perpendicular to the truth heading - what row guidance cares about |
+| `at_rms_m` | along-track error |
+| `outageN_end_err_m`, `outage_end_err_max_m` | error at the end of each GNSS outage (drift) |
+
+Phone recordings have no truth; for them `static_metrics` gives std east/north and
+CEP50/95 around the session mean.
 
 ## Synthetic scenarios
 
@@ -50,9 +69,14 @@ counter-clockwise, in radians.
 
 ```
 poslab/                 the test harness (Python package)
-  __main__.py           CLI (generate; run/report/baseline-update follow)
+  __main__.py           CLI: generate, run (report, baseline-update in M4)
   sim/scenario.py       synthetic tractor scenario generator
-  io/loaders.py         load generated scenarios
+  io/loaders.py         load generated scenarios and GnssLogger recordings
+  dsp.py                Welch PSD, dominant frequency, Butterworth low-pass
+  fusion/gnss_kf.py     baseline: GNSS-only constant-velocity Kalman filter
+  fusion/registry.py    algorithm name -> class (+ VERSION)
+  metrics.py            accuracy, cross-track, outage drift, static metrics
+  runner.py             scenario -> algorithm -> metrics glue
 tools/plot_scenario.py  truth / raw-sensor overview plot
 data/scenarios/         scenario definitions (YAML)
 data/recordings/        my own phone recordings (GnssLogger .txt + meta.yaml)

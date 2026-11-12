@@ -1,6 +1,9 @@
-"""Command line: ``python -m poslab generate [--all|--smoke|NAME ...]``.
+"""Command line.
 
-``run``, ``report`` and ``baseline-update`` are added in later milestones (M2-M4).
+    python -m poslab generate [--all|--smoke|NAME ...]
+    python -m poslab run [--algo NAME ...] [--all|--smoke|NAME ...]   -> out/metrics.json
+
+``report`` and ``baseline-update`` are added in M4.
 """
 from __future__ import annotations
 
@@ -43,19 +46,61 @@ def cmd_generate(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_run(a: argparse.Namespace) -> int:
+    """Run algorithms on scenarios; write metrics JSON and estimate CSVs."""
+    from poslab.fusion.registry import ALGORITHMS
+    from poslab.runner import ensure_generated, run_one, write_metrics
+
+    algos = a.algo or sorted(ALGORITHMS)
+    unknown = [n for n in algos if n not in ALGORITHMS]
+    if unknown:
+        raise SystemExit(f"unknown algorithm(s) {unknown}; available: {sorted(ALGORITHMS)}")
+    out = Path(a.out)
+    results: dict[str, dict[str, dict]] = {}
+    print(f"{'scenario':20s} {'algo':8s} {'h_rms':>8s} {'h_cep95':>8s} {'xt_rms':>8s} "
+          f"{'xt_max':>8s} {'outage_end':>10s}   [m]")
+    for f in select_scenarios(Path(a.scenarios), a.names, a.smoke):
+        scn = ensure_generated(f, Path(a.generated))
+        for algo in algos:
+            est, m = run_one(scn, algo)
+            results.setdefault(scn.name, {})[algo] = m
+            est_path = out / "estimates" / scn.name / f"{algo}.csv"
+            est_path.parent.mkdir(parents=True, exist_ok=True)
+            est.to_csv(est_path, index=False, float_format="%.6f")
+            oe = m.get("outage_end_err_max_m")
+            print(f"{scn.name:20s} {algo:8s} {m['h_rms_m']:8.3f} {m['h_cep95_m']:8.3f} "
+                  f"{m['xt_rms_m']:8.3f} {m['xt_max_m']:8.3f} "
+                  f"{'-' if oe is None else f'{oe:.3f}':>10s}")
+    print(f"\nMetrics: {write_metrics(results, out / 'metrics.json')}")
+    return 0
+
+
+def _add_selection(p: argparse.ArgumentParser) -> None:
+    """Scenario selection options shared by generate and run."""
+    sel = p.add_mutually_exclusive_group()
+    sel.add_argument("--all", action="store_true", help="all scenarios (default)")
+    sel.add_argument("--smoke", action="store_true", help="only scenarios marked smoke: true")
+    p.add_argument("names", nargs="*", help="scenario names (file stems) instead of --all")
+    p.add_argument("--scenarios", default=str(DEFAULT_SCENARIOS), help="scenario YAML directory")
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for ``python -m poslab`` and the ``poslab`` command."""
     p = argparse.ArgumentParser(prog="poslab", description="Positioning replay test harness")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     g = sub.add_parser("generate", help="generate synthetic scenario data")
-    sel = g.add_mutually_exclusive_group()
-    sel.add_argument("--all", action="store_true", help="all scenarios (default)")
-    sel.add_argument("--smoke", action="store_true", help="only scenarios marked smoke: true")
-    g.add_argument("names", nargs="*", help="scenario names (file stems) instead of --all")
-    g.add_argument("--scenarios", default=str(DEFAULT_SCENARIOS), help="scenario YAML directory")
+    _add_selection(g)
     g.add_argument("--out", default=str(DEFAULT_GENERATED), help="output root directory")
     g.set_defaults(func=cmd_generate)
+
+    r = sub.add_parser("run", help="run algorithms on scenarios -> out/metrics.json")
+    _add_selection(r)
+    r.add_argument("--algo", nargs="+", help="algorithm name(s); default: all registered")
+    r.add_argument("--generated", default=str(DEFAULT_GENERATED),
+                   help="generated data root (missing/stale scenarios are regenerated)")
+    r.add_argument("--out", default="out", help="output directory")
+    r.set_defaults(func=cmd_run)
 
     a = p.parse_args(argv)
     return a.func(a)

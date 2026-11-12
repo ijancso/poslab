@@ -1,0 +1,18 @@
+# Hand-written test fixture in GnssLogger v3 format (not a real recording)
+#
+# Header Description:
+#
+# Version: v3.0.5.6 Platform: 13 Manufacturer: TestPhone Model: Fixture
+#
+# Raw,utcTimeMillis,TimeNanos,LeapSecond,TimeUncertaintyNanos,FullBiasNanos
+#
+# Fix,Provider,LatitudeDegrees,LongitudeDegrees,AltitudeMeters,SpeedMps,AccuracyMeters,BearingDegrees,UnixTimeMillis,SpeedAccuracyMps,BearingAccuracyDegrees,elapsedRealtimeNanos,VerticalAccuracyMeters,MockLocation
+#
+Raw,1700000000000,1,18,0,-1
+Fix,GPS,47.0000000,19.0000000,120.0,0.0,3.02,,1700000000000,,,1,4.0,0
+Fix,FLP,47.0001000,19.0001000,120.0,0.0,15.0,,1700000000500,,,1,8.0,0
+Fix,GPS,47.0000100,19.0000000,121.0,0.0,3.02,,1700000001000,,,1,4.0,0
+Fix,GPS,47.0000100,19.0000100,121.0,0.0,3.02,,1700000002000,,,1,4.0,0
+Fix,GPS,47.0000100,19.0000100,121.0,0.0,3.02,,1700000002000,,,1,4.0,0
+Fix,GPS,,19.0000100,121.0,0.0,3.02,,1700000003000,,,1,4.0,0
+Fix,gps,47.0000000,19.0000100,120.0,0.0,1.51,,1700000004000

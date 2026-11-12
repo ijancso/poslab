@@ -22,6 +22,8 @@ jobs:
         run: |
           python -m poslab generate --smoke
           python tools/plot_scenario.py open_sky_rtk outage_10s_row
+      - name: Run algorithms on smoke scenarios
+        run: python -m poslab run --smoke
       - name: Legacy demo run on synthetic data
         run: |
           gnsslab simulate --out "$RUNNER_TEMP/sample"

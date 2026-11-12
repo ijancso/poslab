@@ -26,7 +26,7 @@ gnsslab = "gnsslab.cli:main"
 poslab = "poslab.__main__:main"
 
 [tool.setuptools]
-packages = ["poslab", "poslab.sim", "poslab.io", "gnsslab"]
+packages = ["poslab", "poslab.sim", "poslab.io", "poslab.fusion", "gnsslab"]
 
 [tool.setuptools.package-dir]
 gnsslab = "legacy/gnsslab"
