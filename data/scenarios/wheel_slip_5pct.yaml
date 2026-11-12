@@ -1,0 +1,9 @@
+description: >
+  Wheel odometry reads 5 % high (slip on soft soil), with a 10 s GNSS outage on a row
+  so that the speed error turns into along-track drift.
+seed: 106
+gnss:
+  sigma: 0.02
+  outages: [[120.0, 130.0]]
+odom:
+  scale_error: 0.05

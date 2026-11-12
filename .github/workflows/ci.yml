@@ -14,9 +14,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
-      - run: pytest -q
-      - name: Demo run on synthetic data
+      - name: Lint (poslab)
+        run: ruff check poslab tests tools
+      - name: Tests (poslab + legacy)
+        run: pytest -q --cov=poslab --cov-report=term-missing
+      - name: Generate smoke scenarios and plot them
         run: |
-          gnsslab simulate --out /tmp/sample
-          gnsslab static open=/tmp/sample/static_open_sky.txt urban=/tmp/sample/static_urban.txt --out /tmp/static
-          gnsslab drive /tmp/sample/drive.csv --out /tmp/drive
+          python -m poslab generate --smoke
+          python tools/plot_scenario.py open_sky_rtk outage_10s_row
+      - name: Legacy demo run on synthetic data
+        run: |
+          gnsslab simulate --out "$RUNNER_TEMP/sample"
+          gnsslab static open="$RUNNER_TEMP/sample/static_open_sky.txt" urban="$RUNNER_TEMP/sample/static_urban.txt" --out "$RUNNER_TEMP/static"
+          gnsslab drive "$RUNNER_TEMP/sample/drive.csv" --out "$RUNNER_TEMP/drive"

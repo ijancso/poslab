@@ -1,0 +1,10 @@
+description: >
+  Strong engine vibration on the accelerometers (2.5 m/s^2 at 27 Hz, about 8x the
+  default). Tests that the accel low-pass filter keeps vibration out of the estimate.
+seed: 105
+gnss:
+  sigma: 0.02
+  outages: [[120.0, 130.0]]
+imu:
+  vib_hz: 27.0
+  vib_amp: 2.5

@@ -1,0 +1,6 @@
+description: >
+  Reference case. RTK-like GNSS (2 cm), default IMU and odometry, no outages.
+seed: 101
+smoke: true
+gnss:
+  sigma: 0.02
