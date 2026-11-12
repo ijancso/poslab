@@ -10,22 +10,50 @@ a report for developers → all of it running in CI.
 > recordings from my own Android phone. Nothing here was field-tested on a real vehicle,
 > and no claim of field-testing experience is made.
 
-> **Status:** work in progress. The repo layout is set up (milestone M0); the scenario
-> generator, algorithms, metrics, baseline regression, HTML report and CI pipeline follow
-> in milestones M1–M4.
+> **Status:** work in progress. Done: scenario generator (M1). Next: DSP, a GNSS-only
+> Kalman filter and metrics (M2), the fusion EKF (M3), baseline regression, HTML report
+> and full CI (M4).
 
 ## Quick start
 
 ```bash
-python -m venv .venv && . .venv/bin/activate
+python3 -m venv .venv && . .venv/bin/activate   # Debian/Ubuntu: apt install python3-venv
 pip install -e ".[dev]"
 pytest -q
+
+python -m poslab generate --all          # or --smoke, or scenario names
+python tools/plot_scenario.py open_sky_rtk outage_30s_turn   # -> out/plots/*.png
 ```
+
+## Synthetic scenarios
+
+`data/scenarios/*.yaml` override the defaults in `poslab/sim/scenario.py`. The field is
+8 rows × 200 m, 6 m apart, joined by 3 m-radius headland U-turns; the tractor drives
+2.5 m/s on rows and 1.2 m/s in turns (±0.3 m/s² ramps). Truth is sampled at 100 Hz;
+sensors are GNSS 10 Hz, IMU 100 Hz (with 27 Hz engine vibration), wheel odometry 50 Hz.
+Each scenario has its own seed, so the data is reproducible. Generated files go to
+`data/generated/<name>/` (truth, gnss, imu, odom CSVs + resolved `meta.yaml`).
+
+| Scenario | What it stresses | Smoke |
+|---|---|---|
+| `open_sky_rtk` | reference: 2 cm GNSS, no outage | ✓ |
+| `standalone_noisy` | 1.5 m GNSS, bias drift, multipath spikes | |
+| `outage_10s_row` | 10 s GNSS outage on a straight row | ✓ |
+| `outage_30s_turn` | 30 s outage through a 180° headland turn | |
+| `heavy_vibration` | 2.5 m/s² engine vibration on the accelerometer (+10 s outage) | |
+| `wheel_slip_5pct` | odometry reads 5 % high (+10 s outage) | |
+
+Frame: local ENU in metres (x east, y north); heading is measured from east,
+counter-clockwise, in radians.
 
 ## Layout
 
 ```
 poslab/                 the test harness (Python package)
+  __main__.py           CLI (generate; run/report/baseline-update follow)
+  sim/scenario.py       synthetic tractor scenario generator
+  io/loaders.py         load generated scenarios
+tools/plot_scenario.py  truth / raw-sensor overview plot
 data/scenarios/         scenario definitions (YAML)
 data/recordings/        my own phone recordings (GnssLogger .txt + meta.yaml)
 data/generated/         generated scenario data (gitignored)

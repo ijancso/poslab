@@ -1,0 +1,11 @@
+description: >
+  Standalone (non-RTK) GNSS: 1.5 m white noise, slowly wandering bias and occasional
+  multipath spikes. Tests how much the fusion smooths a poor receiver.
+seed: 102
+gnss:
+  sigma: 1.5
+  bias_rw: 0.05
+  multipath:
+    prob: 0.003
+    amp: 8.0
+    epochs: 5

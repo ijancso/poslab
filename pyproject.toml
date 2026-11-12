@@ -23,9 +23,10 @@ dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4"]
 [project.scripts]
 # earlier experiments (legacy/gnsslab), kept runnable
 gnsslab = "gnsslab.cli:main"
+poslab = "poslab.__main__:main"
 
 [tool.setuptools]
-packages = ["poslab", "gnsslab"]
+packages = ["poslab", "poslab.sim", "poslab.io", "gnsslab"]
 
 [tool.setuptools.package-dir]
 gnsslab = "legacy/gnsslab"

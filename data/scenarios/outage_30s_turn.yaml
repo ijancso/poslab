@@ -1,0 +1,8 @@
+description: >
+  RTK GNSS with a 30 s outage from the end of the second row through the headland
+  turn (turn is 171-179 s) into the third row. Hardest coasting case: heading changes
+  by 180 degrees without GNSS.
+seed: 104
+gnss:
+  sigma: 0.02
+  outages: [[160.0, 190.0]]

@@ -1,0 +1,8 @@
+description: >
+  RTK GNSS with a 10 s outage in the middle of the second row (straight driving,
+  rows are 89-171 s). The estimate must coast on IMU + odometry.
+seed: 103
+smoke: true
+gnss:
+  sigma: 0.02
+  outages: [[120.0, 130.0]]
