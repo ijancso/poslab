@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 import yaml
 
+from poslab.baseline import compare_entry, format_deltas, load_regression_config, load_results
 from poslab.fusion.registry import ALGORITHMS
 from poslab.metrics import compute_metrics
 from poslab.runner import ensure_generated, run_one
@@ -60,6 +61,29 @@ def metrics(name: str, algo: str) -> dict[str, Any]:
     if (name, algo) not in _metric_cache:
         _metric_cache[(name, algo)] = run_one(scenario(name), algo)[1]
     return _metric_cache[(name, algo)]
+
+
+BASELINE = load_results(REPO / "baseline" / "metrics.json")
+REGRESSION = load_regression_config(REPO / "thresholds.yaml")
+
+
+def _regression_cases() -> list[Any]:
+    """Same pairs as _cases(), without the xfail: regression is relative to the baseline,
+    so a known requirement failure must still not get worse."""
+    return [pytest.param(*p.values, marks=[m for m in p.marks if m.name != "xfail"], id=p.id)
+            for p in _cases()]
+
+
+@pytest.mark.parametrize("name, algo", _regression_cases())
+def test_no_regression_against_baseline(name: str, algo: str) -> None:
+    if algo not in BASELINE.get(name, {}):
+        pytest.skip(f"no baseline for {algo} on {name} - run 'python -m poslab baseline-update'")
+    deltas = compare_entry(name, algo, metrics(name, algo), BASELINE[name][algo], REGRESSION)
+    failed = [d for d in deltas if d.failed]
+    assert not failed, (f"{algo} on {name}: worse than baseline/metrics.json\n"
+                        + format_deltas(deltas, only_changed=False)
+                        + "\nIf the change is intended: python -m poslab run --all && "
+                          "python -m poslab baseline-update")
 
 
 @pytest.mark.parametrize("name, algo", _cases())

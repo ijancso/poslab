@@ -2,8 +2,8 @@
 
     python -m poslab generate [--all|--smoke|NAME ...]
     python -m poslab run [--algo NAME ...] [--all|--smoke|NAME ...]   -> out/metrics.json
-
-``report`` and ``baseline-update`` are added in M4.
+    python -m poslab report                                          -> out/report/index.html
+    python -m poslab baseline-update [--yes]      out/metrics.json -> baseline/metrics.json
 """
 from __future__ import annotations
 
@@ -75,6 +75,42 @@ def cmd_run(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_report(a: argparse.Namespace) -> int:
+    """Render the static HTML report from the last run."""
+    from poslab.report import build_report
+
+    path = build_report(a.out, a.generated, a.baseline, a.thresholds)
+    print(f"Report: {path}")
+    return 0
+
+
+def cmd_baseline_update(a: argparse.Namespace) -> int:
+    """Show the diff between the last run and the baseline, then promote it."""
+    from poslab.baseline import (
+        compare,
+        format_deltas,
+        load_regression_config,
+        load_results,
+        promote,
+    )
+
+    current = load_results(Path(a.out) / "metrics.json")
+    if not current:
+        raise SystemExit(f"{Path(a.out) / 'metrics.json'} missing - run 'python -m poslab run'")
+    deltas = compare(current, load_results(a.baseline), load_regression_config(a.thresholds))
+    print(f"Changes vs {a.baseline}:\n{format_deltas(deltas)}")
+    if all(d.status == "same" for d in deltas):
+        print("Baseline is already up to date.")
+        return 0
+    if not a.yes:
+        answer = input(f"Write these metrics to {a.baseline}? [y/N] ").strip().lower()
+        if answer not in ("y", "yes"):
+            print("Baseline not changed.")
+            return 1
+    print(f"Baseline updated: {promote(current, a.baseline)}")
+    return 0
+
+
 def _add_selection(p: argparse.ArgumentParser) -> None:
     """Scenario selection options shared by generate and run."""
     sel = p.add_mutually_exclusive_group()
@@ -101,6 +137,20 @@ def main(argv: list[str] | None = None) -> int:
                    help="generated data root (missing/stale scenarios are regenerated)")
     r.add_argument("--out", default="out", help="output directory")
     r.set_defaults(func=cmd_run)
+
+    rp = sub.add_parser("report", help="static HTML report -> out/report/index.html")
+    rp.add_argument("--out", default="out", help="directory with metrics.json and estimates/")
+    rp.add_argument("--generated", default=str(DEFAULT_GENERATED))
+    rp.add_argument("--baseline", default="baseline/metrics.json")
+    rp.add_argument("--thresholds", default="thresholds.yaml")
+    rp.set_defaults(func=cmd_report)
+
+    b = sub.add_parser("baseline-update", help="promote out/metrics.json to the baseline")
+    b.add_argument("--out", default="out", help="directory with metrics.json")
+    b.add_argument("--baseline", default="baseline/metrics.json")
+    b.add_argument("--thresholds", default="thresholds.yaml")
+    b.add_argument("--yes", action="store_true", help="do not ask for confirmation")
+    b.set_defaults(func=cmd_baseline_update)
 
     a = p.parse_args(argv)
     return a.func(a)

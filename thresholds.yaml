@@ -8,6 +8,15 @@
 # reason. Its test is a strict xfail - if it ever passes, the test run reports it and this
 # file must be updated. Regression against the stored baseline is a separate check (M4).
 
+# Regression against baseline/metrics.json: a metric fails when it is worse than the
+# baseline by more than its relative tolerance AND by more than min_abs_delta (same unit
+# as the metric), so sub-millimetre changes of centimetre-level metrics do not count.
+regression:
+  default_tolerance: 0.05
+  min_abs_delta: 0.0005
+  tolerances:
+    h_max_m: 0.10          # single worst sample: noisier than RMS/percentiles
+
 scenarios:
   open_sky_rtk:
     limits:
