@@ -8,11 +8,12 @@ from __future__ import annotations
 from typing import Any
 
 from poslab.fusion.base import Algorithm
+from poslab.fusion.ekf import FusionEKF
 from poslab.fusion.gnss_kf import GnssKF
 
 ALGORITHMS: dict[str, type[Algorithm]] = {
     GnssKF.NAME: GnssKF,
-    # "ekf" is added in M3
+    FusionEKF.NAME: FusionEKF,
 }
 
 

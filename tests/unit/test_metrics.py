@@ -38,6 +38,16 @@ def test_constant_offset_east_is_pure_cross_track():
     assert m["n_samples"] == 201
 
 
+def test_speed_rms_ignores_nan_before_initialisation():
+    tr = north_truth()
+    est = estimate(tr, 0.0, 0.0)
+    est["v"] = 2.1                                              # truth speed is 2.0
+    est.loc[est.t < 6.0, "v"] = np.nan
+    m = compute_metrics(est, tr, warmup_s=0.0)
+    assert m["v_rms_mps"] == pytest.approx(0.1)
+    assert "v_rms_mps" not in compute_metrics(est.drop(columns="v"), tr, warmup_s=0.0)
+
+
 def test_offset_behind_is_pure_along_track():
     tr = north_truth()
     m = compute_metrics(estimate(tr, 0.0, -1.0), tr, warmup_s=0.0)

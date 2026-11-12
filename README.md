@@ -10,16 +10,17 @@ a report for developers → all of it running in CI.
 > recordings from my own Android phone. Nothing here was field-tested on a real vehicle,
 > and no claim of field-testing experience is made.
 
-> **Status:** work in progress. Done: scenario generator (M1); DSP, the GNSS-only baseline
-> Kalman filter, metrics and the GnssLogger loader (M2). Next: the fusion EKF and scenario
-> tests (M3), baseline regression, HTML report and full CI (M4).
+> **Status:** work in progress. Done: scenario generator (M1); DSP, GNSS-only baseline
+> filter, metrics, GnssLogger loader (M2); fusion EKF, scenario tests and thresholds (M3).
+> Next: baseline regression, HTML report and full CI (M4).
 
 ## Quick start
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate   # Debian/Ubuntu: apt install python3-venv
 pip install -e ".[dev]"
-pytest -q
+pytest -q                  # everything: unit + scenario tests
+pytest -q -m smoke         # smoke subset: 2 scenarios x all algorithms
 
 python -m poslab generate --all          # or --smoke, or scenario names
 python tools/plot_scenario.py open_sky_rtk outage_30s_turn   # -> out/plots/*.png
@@ -32,17 +33,63 @@ different YAML / generator version, prints a summary table and writes `out/metri
 
 ## Metrics
 
-All in metres, after a 5 s filter warm-up:
+Distances in metres, speed in m/s, after a 5 s filter warm-up:
 
 | Key | Meaning |
 |---|---|
 | `h_rms_m`, `h_cep50_m`, `h_cep95_m`, `h_max_m` | horizontal error vs truth (CEP = percentile radius) |
 | `xt_rms_m`, `xt_max_m` | cross-track error: perpendicular to the truth heading - what row guidance cares about |
 | `at_rms_m` | along-track error |
+| `v_rms_mps` | speed error [m/s] - where accelerometer vibration shows up |
 | `outageN_end_err_m`, `outage_end_err_max_m` | error at the end of each GNSS outage (drift) |
 
 Phone recordings have no truth; for them `static_metrics` gives std east/north and
 CEP50/95 around the session mean.
+
+## Algorithms
+
+| Name | What it is |
+|---|---|
+| `gnss_kf` | the "old" baseline: 2D constant-velocity Kalman filter on GNSS positions only |
+| `ekf` | algorithm under test: EKF with state [x, y, heading, v]; predicts with gyro yaw rate and low-pass-filtered (causal Butterworth) longitudinal acceleration, updates with GNSS position and wheel-odometry speed, coasts through GNSS outages |
+
+Both reject GNSS outliers with a chi-square innovation gate. Every algorithm has a
+`VERSION`, stored with its metrics.
+
+## Requirements and current results
+
+`thresholds.yaml` holds per-scenario requirements (e.g. ≤ 10 cm cross-track error on RTK
+rows, ≤ 1 m drift after a 30 s outage through a turn). `tests/scenario` runs every
+algorithm on every scenario against them; an algorithm that is *known* not to meet a
+scenario's requirements is listed there with the reason and tested as a strict xfail.
+
+Current results (`python -m poslab run --all`, metres):
+
+| Scenario | Algorithm | h_cep95 | xt_max | outage end err | v_rms [m/s] | Requirements |
+|---|---|---|---|---|---|---|
+| open_sky_rtk | gnss_kf | 0.034 | 0.052 | – | 0.056 | pass |
+| | ekf | 0.017 | 0.028 | – | 0.008 | pass |
+| standalone_noisy | gnss_kf | 1.97 | 2.55 | – | 0.231 | known failure |
+| | ekf | 1.64 | 1.90 | – | 0.008 | pass |
+| outage_10s_row | gnss_kf | 0.036 | 0.417 | 0.69 | 0.057 | known failure |
+| | ekf | 0.018 | 0.160 | 0.16 | 0.008 | pass |
+| outage_30s_turn | gnss_kf | 0.042 | 9.84 | 73.7 | 0.169 | known failure |
+| | ekf | 0.021 | 0.408 | 0.41 | 0.008 | pass |
+| heavy_vibration | gnss_kf | 0.036 | 0.577 | 0.60 | 0.057 | known failure |
+| | ekf | 0.018 | 0.136 | 0.14 | 0.008 | pass |
+| wheel_slip_5pct | gnss_kf | 0.035 | 0.217 | 0.63 | 0.055 | pass |
+| | ekf | 0.130 | 0.253 | 1.36 | 0.118 | **known failure** |
+
+What the tests found:
+
+- **Outages:** the EKF coasts through a 30 s outage in a headland turn with 0.4 m drift;
+  the GNSS-only filter drives straight on and ends 74 m off.
+- **Wheel slip:** `ekf` 1.0 has no odometry scale-factor state, so 5 % slip biases the
+  fused speed and pulls the position along-track even while RTK is available - here the
+  old algorithm is better. Fix candidate: estimate the scale factor (5-state EKF).
+- **Vibration:** 27 Hz engine vibration integrates out of the *position* almost entirely
+  (zero-mean, high frequency); it shows up in the *speed* estimate. Without the
+  low-pass filter `heavy_vibration` fails its speed requirement (a test checks this).
 
 ## Synthetic scenarios
 
@@ -74,9 +121,12 @@ poslab/                 the test harness (Python package)
   io/loaders.py         load generated scenarios and GnssLogger recordings
   dsp.py                Welch PSD, dominant frequency, Butterworth low-pass
   fusion/gnss_kf.py     baseline: GNSS-only constant-velocity Kalman filter
+  fusion/ekf.py         algorithm under test: GNSS + odometry + IMU EKF
   fusion/registry.py    algorithm name -> class (+ VERSION)
   metrics.py            accuracy, cross-track, outage drift, static metrics
   runner.py             scenario -> algorithm -> metrics glue
+  thresholds.py         load thresholds.yaml, check metrics against limits
+thresholds.yaml         per-scenario pass/fail requirements
 tools/plot_scenario.py  truth / raw-sensor overview plot
 data/scenarios/         scenario definitions (YAML)
 data/recordings/        my own phone recordings (GnssLogger .txt + meta.yaml)

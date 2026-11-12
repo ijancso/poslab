@@ -14,6 +14,8 @@ Definitions
   the crop row. Along-track error (timing) is reported separately and matters less.
 * outage drift: the horizontal error at the last estimate inside each GNSS outage, and the
   error as a function of time into the outage (``outage_drift_curve``).
+* speed error ``v_rms_mps``: RMS of estimated minus true speed [m/s] (speed feeds e.g. the
+  seeding/spraying rate; it is also where accelerometer vibration shows up).
 """
 from __future__ import annotations
 
@@ -84,6 +86,12 @@ def compute_metrics(est: pd.DataFrame, truth: pd.DataFrame,
         "xt_max_m": float(np.abs(xt).max()),
         "at_rms_m": _rms(err["along"].to_numpy()),
     }
+    if "v" in est.columns:
+        sel = err_all["t"] >= err_all["t"].iloc[0] + warmup_s
+        v_est = est["v"].to_numpy()[sel.to_numpy()]
+        v_true = np.interp(err["t"].to_numpy(), truth["t"], truth["speed"])
+        ok = np.isfinite(v_est)
+        m["v_rms_mps"] = _rms(v_est[ok] - v_true[ok])
     if len(outages):
         curve = outage_drift_curve(err_all, outages)
         ends = []

@@ -1,0 +1,63 @@
+# Pass/fail requirements per scenario, checked by tests/scenario (pytest -m scenario).
+# Every listed metric must be <= its limit. Units: metres (_m) and metres/second (_mps).
+#
+# The limits are requirements for row guidance with RTK GNSS, not "whatever the current
+# code achieves": e.g. 10 cm maximum cross-track error on a straight row.
+#
+# known_failures: an algorithm that is expected NOT to meet the requirements, with the
+# reason. Its test is a strict xfail - if it ever passes, the test run reports it and this
+# file must be updated. Regression against the stored baseline is a separate check (M4).
+
+scenarios:
+  open_sky_rtk:
+    limits:
+      h_cep95_m: 0.05
+      xt_max_m: 0.10
+      v_rms_mps: 0.10
+
+  standalone_noisy:
+    limits:
+      h_cep95_m: 2.2
+      xt_max_m: 2.2
+    known_failures:
+      gnss_kf: >
+        No motion model beyond constant velocity: multipath spikes that pass the gate and
+        the bias drift reach the cross-track error directly (xt_max ~2.5 m).
+
+  outage_10s_row:
+    limits:
+      xt_max_m: 0.30
+      outage_end_err_max_m: 0.50
+    known_failures:
+      gnss_kf: >
+        GNSS-only: during the outage it extrapolates the last velocity estimate, whose
+        error grows the drift to ~0.7 m after 10 s.
+
+  outage_30s_turn:
+    limits:
+      xt_max_m: 1.0
+      outage_end_err_max_m: 1.0
+    known_failures:
+      gnss_kf: >
+        GNSS-only: keeps driving straight through the headland turn (~74 m drift).
+
+  heavy_vibration:
+    limits:
+      h_cep95_m: 0.05
+      outage_end_err_max_m: 0.50
+      v_rms_mps: 0.010
+    known_failures:
+      gnss_kf: >
+        GNSS-only: same outage drift as outage_10s_row, and its speed comes from
+        differentiated GNSS positions (v_rms ~0.06 m/s).
+
+  wheel_slip_5pct:
+    limits:
+      h_cep95_m: 0.05
+      xt_max_m: 0.30
+      outage_end_err_max_m: 1.5
+    known_failures:
+      ekf: >
+        ekf 1.0 has no odometry scale-factor state: 5 % slip biases the fused speed, which
+        pulls the position along-track even while RTK is available (h_cep95 ~0.13 m).
+        Fix candidate: estimate the odometry scale factor (5-state EKF).

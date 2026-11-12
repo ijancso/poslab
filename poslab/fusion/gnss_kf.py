@@ -25,7 +25,7 @@ from typing import Any, ClassVar
 import numpy as np
 import pandas as pd
 
-from poslab.fusion.base import ESTIMATE_COLUMNS, SensorData, merge_params, output_times
+from poslab.fusion.base import ESTIMATE_COLUMNS, Gate, SensorData, merge_params, output_times
 
 DEFAULTS: dict[str, Any] = {
     "q": 0.05,              # [m^2/s^3] white-noise acceleration spectral density
@@ -70,7 +70,8 @@ class GnssKF:
         s = np.array([z[0, 0], z[0, 1], 0.0, 0.0])
         p = np.diag([sig[0] ** 2, sig[0] ** 2, c["init_vel_sigma"] ** 2, c["init_vel_sigma"] ** 2])
         h = np.hstack([np.eye(2), np.zeros((2, 2))])
-        t_now, streak, self.rejected = float(tz[0]), 0, 0
+        t_now = float(tz[0])
+        gate = Gate(c["gate"], c["max_rejects"])
         out = np.zeros((len(t_out), 4))
         for t, kind, i in events:
             if t > t_now:
@@ -85,24 +86,20 @@ class GnssKF:
             innov = z[i] - h @ s
             sm = h @ p @ h.T + sig[i] ** 2 * np.eye(2)
             d2 = float(innov @ np.linalg.solve(sm, innov))
-            if c["gate"] and d2 > c["gate"]:
-                if streak < c["max_rejects"]:
-                    streak += 1
-                    self.rejected += 1
-                    continue
-                # GNSS keeps disagreeing: trust it - re-initialise the position at the fix
-                # (a single forced update would barely move a confident filter)
+            verdict = gate.check(d2)
+            if verdict == "reject":
+                continue
+            if verdict == "reset":                        # re-initialise position at the fix
                 s[:2] = z[i]
                 p[:2, :] = 0.0
                 p[:, :2] = 0.0
                 p[:2, :2] = sig[i] ** 2 * np.eye(2)
                 p[2:, 2:] += c["init_vel_sigma"] ** 2 * np.eye(2)
-                streak = 0
                 continue
-            streak = 0
             k = p @ h.T @ np.linalg.inv(sm)
             s = s + k @ innov
             p = (np.eye(4) - k @ h) @ p
+        self.rejected = gate.rejected
         return pd.DataFrame({
             "t": t_out, "x": out[:, 0], "y": out[:, 1],
             "heading": np.arctan2(out[:, 3], out[:, 2]),

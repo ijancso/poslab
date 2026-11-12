@@ -49,6 +49,32 @@ def merge_params(defaults: dict[str, Any], overrides: dict[str, Any] | None) -> 
     return {**defaults, **(overrides or {})}
 
 
+class Gate:
+    """Chi-square innovation gate with a give-up rule.
+
+    ``check(d2)`` returns "accept", "reject" (outlier) or "reset". "reset" means GNSS has
+    disagreed ``max_rejects`` times in a row: the filter, not GNSS, is probably wrong, and
+    the caller should re-initialise its position at the fix - a single forced update would
+    barely move a confident filter. ``threshold`` None/0 disables gating.
+    """
+
+    def __init__(self, threshold: float | None, max_rejects: int) -> None:
+        self.threshold, self.max_rejects = threshold, max_rejects
+        self.streak = 0
+        self.rejected = 0      # total rejected fixes (diagnostics)
+
+    def check(self, d2: float) -> str:
+        if not self.threshold or d2 <= self.threshold:
+            self.streak = 0
+            return "accept"
+        if self.streak < self.max_rejects:
+            self.streak += 1
+            self.rejected += 1
+            return "reject"
+        self.streak = 0
+        return "reset"
+
+
 def output_times(data: SensorData, rate_hz: float) -> np.ndarray:
     """Regular output grid from the first GNSS fix to the end of the data.
 
