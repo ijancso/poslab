@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-GENERATOR_VERSION = "1.0"
+GENERATOR_VERSION = "1.1"
 
 DEFAULTS: dict[str, Any] = {
     "description": "",
@@ -81,7 +81,7 @@ class Scenario:
 
     name: str
     truth: pd.DataFrame     # t, x, y, heading, speed, yaw_rate, accel_long
-    gnss: pd.DataFrame      # t, x, y
+    gnss: pd.DataFrame      # t, x, y, sigma (receiver-reported 1-sigma per axis)
     imu: pd.DataFrame       # t, accel_long, accel_lat, yaw_rate
     odom: pd.DataFrame      # t, speed
     meta: dict[str, Any] = field(default_factory=dict)
@@ -253,7 +253,11 @@ def _decimate(truth: pd.DataFrame, truth_hz: float, rate_hz: float) -> pd.DataFr
 
 def make_gnss(truth: pd.DataFrame, cfg: dict[str, Any], rng: np.random.Generator) -> pd.DataFrame:
     """GNSS positions: truth + white noise + bias random walk + multipath spikes,
-    with the outage windows removed."""
+    with the outage windows removed.
+
+    ``sigma`` is what the receiver *reports* (like Android's accuracy field): the nominal
+    white-noise level. It does not include bias or multipath - receivers are optimistic.
+    """
     g = cfg["gnss"]
     tr = _decimate(truth, cfg["motion"]["rate_hz"], g["rate_hz"])
     n, dt = len(tr), 1.0 / g["rate_hz"]
@@ -271,7 +275,9 @@ def make_gnss(truth: pd.DataFrame, cfg: dict[str, Any], rng: np.random.Generator
         if t1 <= t0:
             raise ValueError(f"outage window [{t0}, {t1}] must have t1 > t0")
         keep &= ~((tr["t"].to_numpy() >= t0) & (tr["t"].to_numpy() < t1))
-    return pd.DataFrame({"t": tr["t"], "x": pos[:, 0], "y": pos[:, 1]})[keep].reset_index(drop=True)
+    out = pd.DataFrame({"t": tr["t"], "x": pos[:, 0], "y": pos[:, 1],
+                        "sigma": np.full(n, float(g["sigma"]))})
+    return out[keep].reset_index(drop=True)
 
 
 def make_imu(truth: pd.DataFrame, cfg: dict[str, Any], rng: np.random.Generator) -> pd.DataFrame:
